@@ -1,0 +1,228 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id                  String    @id @default(cuid())
+    name                String?
+    fullName            String?   @map("full_name")
+    email               String?   @unique
+    emailVerified       DateTime? @map("email_verified")
+    image               String?
+    whatsappNumber      String?   @map("whatsapp_number")
+    isRegisterCompleted Boolean   @default(false) @map("is_register_completed")
+
+    accounts   Account[]
+    sessions   Session[]
+    characters Character[]
+    guilds     UsersInGuild[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("users")
+}
+
+model Guild {
+    id String @id @default(cuid())
+
+    name String
+
+    parties Party[]
+    users   UsersInGuild[]
+
+    @@map("guilds")
+}
+
+model UsersInGuild {
+    id      String @id @default(cuid())
+    guildId String @map("guild_id")
+    userId  String @map("user_id")
+
+    role GuildRole @default(MEMBER)
+
+    guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("users_in_guilds")
+}
+
+enum GuildRole {
+    FOUNDER
+    OFFICER
+    MEMBER
+}
+
+model Character {
+    id      String @id @default(cuid())
+    userId  String @map("user_id")
+    partyId String @map("party_id")
+
+    nickname String
+    level    Int
+    job      Int
+    class    CharacterClass
+
+    user  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    party CharactersInParty[]
+
+    @@map("characters")
+}
+
+enum CharacterClass {
+    // Novice
+    NOVICE
+
+    // First Classes
+    SWORDMAN
+    MAGE
+    MERCHANT
+    ACOLYTE
+    THIEF
+    ARCHER
+    TAEKWON_KID
+    NINJA
+    GUNSLINGER
+    SUPER_NOVICE
+    SUMMONER
+
+    // Second Classes
+    KNIGHT
+    CRUSADER
+    WIZARD
+    SAGE
+    BLACKSMITH
+    ALCHEMIST
+    PRIEST
+    MONK
+    ASSASSIN
+    ROGUE
+    HUNTER
+    BARD
+    DANCER
+    TAEKWON_MASTER
+    SOUL_LINKER
+    KAGEROU
+    OBORO
+    REBEL
+    EXPANDED_SUPER_NOVICE
+    SPIRIT_HANDLER
+
+    // Transcendent Second Classes
+    LORD_KNIGHT
+    PALADIN
+    HIGH_WIZARD
+    SCHOLAR
+    MASTERSMITH
+    BIOCHEMIST
+    HIGH_PRIEST
+    CHAMPION
+    ASSASSIN_CROSS
+    STALKER
+    SNIPER
+    MINSTREL
+    GYPSY
+
+    // Third Classes
+    RUNE_KNIGHT
+    ROYAL_GUARD
+    WARLOCK
+    SORCERER
+    MECHANIC
+    GENETICIST
+    ARCH_BISHOP
+    SURA
+    GUILLOTINE_CROSS
+    SHADOW_CHASER
+    RANGER
+    MAESTRO
+    WANDERER
+    STAR_EMPEROR
+    SOUL_REAPER
+    SHINKIRO
+    SHIRANUI
+    NIGHT_WATCH
+    HYPER_NOVICE
+
+    // Fourth Classes
+    DRAGON_KNIGHT
+    IMPERIAL_GUARD
+    ARCH_MAGE
+    ELEMENTAL_MASTER
+    MEISTER
+    BIOLO
+    CARDINAL
+    INQUISITOR
+    SHADOW_CROSS
+    ABYSS_CHASER
+    WINDHAWK
+    TROUBADOUR
+    TROUVERE
+    SKY_EMPEROR
+    SOUL_ASCETIC
+}
+
+model Party {
+    id      String @id @default(cuid())
+    guildId String @map("guild_id")
+
+    characters CharactersInParty[]
+    guild      Guild               @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+    @@map("parties")
+}
+
+model CharactersInParty {
+    id          String @id @default(cuid())
+    characterId String @map("character_id")
+    partyId     String @map("party_id")
+
+    character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+    party     Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+    @@map("character_in_parties")
+}
+
+model Account {
+    id                       String  @id @default(cuid())
+    userId                   String  @map("user_id")
+    type                     String
+    provider                 String
+    providerAccountId        String  @map("provider_account_id")
+    refresh_token            String? @db.Text
+    access_token             String? @db.Text
+    expires_at               Int?
+    token_type               String?
+    scope                    String?
+    id_token                 String? @db.Text
+    session_state            String?
+    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    refresh_token_expires_in Int?
+
+    @@unique([provider, providerAccountId])
+    @@map("accounts")
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique @map("session_token")
+    userId       String   @map("user_id")
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("sessions")
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+    @@map("verification_tokens")
+}
