@@ -7,217 +7,89 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
+/// Enum definindo papéis de um usuário dentro de uma guilda.
+enum GuildMemberRole {
+    MEMBER // Membro comum da guilda
+    OFFICER // Oficial da guilda com privilégios elevados
+}
+
+/// Enum definindo o status de associação durante o fluxo de convite para guilda.
+enum GuildMemberStatus {
+    PENDING // Convidado, aguardando aceitação
+    ACTIVE // Convite aceito
+}
+
+/// Enum para funções de personagem; um personagem pode ter várias funções.
+enum CharacterRoleType {
+    WOE // War of Emperium (WoE)
+    WOE_TE // War of Emperium TE (mutuamente exclusivo com WoE)
+    PVE // Player versus Environment (PvE)
+}
+
+///////////////////////////////////////////////
+/// Modelos de Usuário e Autenticação
+///////////////////////////////////////////////
+
+/// Modelo de Usuário adaptado para login com NextAuth (Discord).
+/// - Registrado via OAuth do Discord.
+/// - Implementa campos exigidos pelo NextAuth para o adapter (Account, Session).
+/// - Armazena informações pessoais: nome completo, idade e número de WhatsApp obrigatório.
 model User {
-    id                  String    @id @default(cuid())
-    name                String?
-    fullName            String?   @map("full_name")
-    email               String?   @unique
-    emailVerified       DateTime? @map("email_verified")
-    image               String?
-    whatsappNumber      String?   @map("whatsapp_number")
-    isRegisterCompleted Boolean   @default(false) @map("is_register_completed")
+    id            String    @id @default(cuid()) // ID único (NextAuth prefere IDs em string, ex: cuid())
+    name          String // Nome completo do usuário (obrigatório)
+    email         String?   @unique // Email (opcional, para provedores que usam email)
+    emailVerified DateTime?
+    image         String?
+    discordId     String    @unique // ID do usuário no Discord (único) para autenticação
+    discordTag    String? // Tag do Discord (ex.: Nome#1234)
+    age           Int // Idade do usuário
+    whatsapp      String    @unique // Número de WhatsApp (único, contato obrigatório)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
 
-    accounts   Account[]
-    sessions   Session[]
-    characters Character[]
-    guilds     UsersInGuild[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@map("users")
+    // Relações
+    accounts    Account[] // Contas NextAuth (suporte multi-provedor)
+    sessions    Session[] // Sessões NextAuth
+    memberships GuildMember[] // Filiações/Convites à guilda
+    characters  Character[] // Personagens pertencentes ao usuário
+    Party       Party?
+    ledGuilds   Guild[]       @relation("GuildLeader") // Guildas lideradas por este usuário
 }
 
-model Guild {
-    id String @id @default(cuid())
-
-    name String
-
-    parties Party[]
-    users   UsersInGuild[]
-
-    @@map("guilds")
-}
-
-model UsersInGuild {
-    id      String @id @default(cuid())
-    guildId String @map("guild_id")
-    userId  String @map("user_id")
-
-    role GuildRole @default(MEMBER)
-
-    guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
-    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-    @@map("users_in_guilds")
-}
-
-enum GuildRole {
-    FOUNDER
-    OFFICER
-    MEMBER
-}
-
-model Character {
-    id      String @id @default(cuid())
-    userId  String @map("user_id")
-    partyId String @map("party_id")
-
-    nickname String
-    level    Int
-    job      Int
-    class    CharacterClass
-
-    user  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-    party CharactersInParty[]
-
-    @@map("characters")
-}
-
-enum CharacterClass {
-    // Novice
-    NOVICE
-
-    // First Classes
-    SWORDMAN
-    MAGE
-    MERCHANT
-    ACOLYTE
-    THIEF
-    ARCHER
-    TAEKWON_KID
-    NINJA
-    GUNSLINGER
-    SUPER_NOVICE
-    SUMMONER
-
-    // Second Classes
-    KNIGHT
-    CRUSADER
-    WIZARD
-    SAGE
-    BLACKSMITH
-    ALCHEMIST
-    PRIEST
-    MONK
-    ASSASSIN
-    ROGUE
-    HUNTER
-    BARD
-    DANCER
-    TAEKWON_MASTER
-    SOUL_LINKER
-    KAGEROU
-    OBORO
-    REBEL
-    EXPANDED_SUPER_NOVICE
-    SPIRIT_HANDLER
-
-    // Transcendent Second Classes
-    LORD_KNIGHT
-    PALADIN
-    HIGH_WIZARD
-    SCHOLAR
-    MASTERSMITH
-    BIOCHEMIST
-    HIGH_PRIEST
-    CHAMPION
-    ASSASSIN_CROSS
-    STALKER
-    SNIPER
-    MINSTREL
-    GYPSY
-
-    // Third Classes
-    RUNE_KNIGHT
-    ROYAL_GUARD
-    WARLOCK
-    SORCERER
-    MECHANIC
-    GENETICIST
-    ARCH_BISHOP
-    SURA
-    GUILLOTINE_CROSS
-    SHADOW_CHASER
-    RANGER
-    MAESTRO
-    WANDERER
-    STAR_EMPEROR
-    SOUL_REAPER
-    SHINKIRO
-    SHIRANUI
-    NIGHT_WATCH
-    HYPER_NOVICE
-
-    // Fourth Classes
-    DRAGON_KNIGHT
-    IMPERIAL_GUARD
-    ARCH_MAGE
-    ELEMENTAL_MASTER
-    MEISTER
-    BIOLO
-    CARDINAL
-    INQUISITOR
-    SHADOW_CROSS
-    ABYSS_CHASER
-    WINDHAWK
-    TROUBADOUR
-    TROUVERE
-    SKY_EMPEROR
-    SOUL_ASCETIC
-}
-
-model Party {
-    id      String @id @default(cuid())
-    guildId String @map("guild_id")
-
-    characters CharactersInParty[]
-    guild      Guild               @relation(fields: [guildId], references: [id], onDelete: Cascade)
-
-    @@map("parties")
-}
-
-model CharactersInParty {
-    id          String @id @default(cuid())
-    characterId String @map("character_id")
-    partyId     String @map("party_id")
-
-    character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-    party     Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
-
-    @@map("character_in_parties")
-}
-
+/// Modelo Account do NextAuth para provedores OAuth (ex.: Discord).
+/// - `providerId` e `providerAccountId` identificam unicamente a conta OAuth.
 model Account {
-    id                       String  @id @default(cuid())
-    userId                   String  @map("user_id")
-    type                     String
-    provider                 String
-    providerAccountId        String  @map("provider_account_id")
-    refresh_token            String? @db.Text
-    access_token             String? @db.Text
-    expires_at               Int?
-    token_type               String?
-    scope                    String?
-    id_token                 String? @db.Text
-    session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    refresh_token_expires_in Int?
+    id                 String    @id @default(cuid())
+    userId             String
+    providerType       String
+    providerId         String
+    providerAccountId  String
+    refreshToken       String?
+    accessToken        String?
+    accessTokenExpires DateTime?
+    createdAt          DateTime  @default(now())
+    updatedAt          DateTime  @updatedAt
 
-    @@unique([provider, providerAccountId])
-    @@map("accounts")
+    user User @relation(fields: [userId], references: [id])
+
+    @@unique([providerId, providerAccountId])
 }
 
+/// Modelo Session do NextAuth para gerenciamento de sessões de usuário.
 model Session {
     id           String   @id @default(cuid())
-    sessionToken String   @unique @map("session_token")
-    userId       String   @map("user_id")
+    sessionToken String   @unique
+    userId       String
     expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    accessToken  String   @unique
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 
-    @@map("sessions")
+    user User @relation(fields: [userId], references: [id])
 }
 
+/// Modelo de token para login por email/sem senha (se usado). Usado pelo NextAuth.
+/// Incluído para completude; pode não ser utilizado se só Discord for permitido.
 model VerificationToken {
     identifier String
     token      String   @unique
@@ -225,4 +97,119 @@ model VerificationToken {
 
     @@unique([identifier, token])
     @@map("verification_tokens")
+}
+
+///////////////////////////////////////////////
+/// Guilda, Tags e Filiação
+///////////////////////////////////////////////
+
+/// Modelo de Guilda (grupo principal).
+/// - Cada guilda tem um nome único e um único líder (Usuário).
+/// - Uma guilda pode ter muitos membros, sub-tags e parties.
+model Guild {
+    id       Int    @id @default(autoincrement())
+    name     String @unique // Nome único da guilda
+    leaderId String // ID do usuário líder da guilda
+    leader   User   @relation("GuildLeader", fields: [leaderId], references: [id])
+
+    // Relações
+    members GuildMember[] // Todas as filiações/convites desta guilda
+    tags    Tag[] // Sub-guildas (tags) sob esta guilda
+    parties Party[] // Parties organizadas nesta guilda
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+/// Tabela intermediária para convites e papéis de membros da guilda.
+/// - Relaciona Usuários a Guildas com papel e status.
+/// - Restrição única em (userId, guildId) para prevenir duplicação.
+/// - Apenas usuários com status ACTIVE estão plenamente associados; PENDING significa convidado, não aceito.
+model GuildMember {
+    id      Int               @id @default(autoincrement())
+    userId  String
+    guildId Int
+    role    GuildMemberRole   @default(MEMBER) // Papel no sistema: OFFICER ou MEMBER
+    status  GuildMemberStatus @default(PENDING) // Status PENDING ou ACTIVE
+
+    user  User  @relation(fields: [userId], references: [id])
+    guild Guild @relation(fields: [guildId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([userId, guildId])
+}
+
+///////////////////////////////////////////////
+/// Tags (Sub-guildas) e Personagens
+///////////////////////////////////////////////
+
+/// Modelo Tag (sub-guilda).
+/// - As tags pertencem a uma guilda. Categoriza personagens (ex: por classe, rank ou reserva).
+/// - A flag `isReserve` indica se a tag é usada para personagens substitutos.
+/// - Assegura nomes de tag únicos dentro de cada guilda.
+model Tag {
+    id        Int     @id @default(autoincrement())
+    name      String
+    guildId   Int
+    isReserve Boolean @default(false) // True se a tag for de personagens reserva
+
+    guild      Guild       @relation(fields: [guildId], references: [id])
+    characters Character[]
+
+    @@unique([name, guildId])
+}
+
+/// Modelo Character representando um personagem de jogador.
+/// - Cada personagem é propriedade de um usuário e atribuído a uma única tag.
+/// - `partyId` referencia a party em que está (pode ser nulo se não estiver em uma party).
+/// - `name` é único globalmente (considerando unicidade no jogo).
+/// - WoE e WOE_TE são mutuamente exclusivos na lógica do jogo e não devem coexistir.
+model Character {
+    id      Int    @id @default(autoincrement())
+    name    String @unique
+    ownerId String
+    tagId   Int
+    partyId Int?
+
+    owner User   @relation(fields: [ownerId], references: [id])
+    tag   Tag    @relation(fields: [tagId], references: [id])
+    party Party? @relation(fields: [partyId], references: [id])
+
+    roles CharacterRole[] // Funções atribuídas ao personagem
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+/// Tabela de junção atribuindo múltiplas funções a Personagens.
+/// - Cada entrada representa uma função atribuída a um personagem.
+/// - Chave primária composta impede duplicação de pares (characterId, role).
+/// - Garante que um personagem não tenha a mesma função duplicada.
+model CharacterRole {
+    character   Character         @relation(fields: [characterId], references: [id])
+    characterId Int
+    role        CharacterRoleType
+
+    @@id([characterId, role])
+}
+
+/// Modelo Party.
+/// - Pertence a uma guilda e tem exatamente um líder (Usuário).
+/// - Um usuário pode liderar no máximo uma party (restrição única em leaderId).
+/// - Contém muitos personagens (via Character.partyId).
+model Party {
+    id       Int    @id @default(autoincrement())
+    name     String
+    guildId  Int
+    leaderId String
+
+    guild  Guild @relation(fields: [guildId], references: [id])
+    leader User  @relation(fields: [leaderId], references: [id])
+
+    characters Character[]
+
+    @@unique([leaderId]) // Usuário só pode liderar uma party por vez
+    @@unique([guildId, name]) // Nome da party deve ser único dentro da guilda
 }
